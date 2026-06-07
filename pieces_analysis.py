@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from matplotlib.container import BarContainer
 
 # Define the PIECES Categories and their question mappings (1-based index in the set of 20)
 CATEGORIES = {
@@ -67,78 +68,89 @@ def main():
 
     print("Processing PIECES Framework - Pre-test Analysis...")
     
+    # Load all data
     k1_df = load_data('kuesioner_1')
     k2_df = load_data('kuesioner_2')
     
+    # Merge K1 and K2
+    all_data = pd.concat([k1_df, k2_df], axis=0).reset_index(drop=True)
+    
     programs = ['D3', 'D4']
+    program_results = {}
     
     for prog in programs:
-        print(f"\nGenerating Pre-test results for {prog}...")
+        print(f"\nProcessing merged results for {prog}...")
         prog_path = os.path.join('output', prog)
         if not os.path.exists(prog_path):
             os.makedirs(prog_path)
             
-        # Filter data for current program
-        prog_k1 = k1_df[k1_df['Program'] == prog]
-        prog_k2 = k2_df[k2_df['Program'] == prog]
-        
-        print(f"  Respondents - Kuesioner 1: {len(prog_k1)}, Kuesioner 2: {len(prog_k2)}")
+        # Filter merged data for current program
+        prog_df = all_data[all_data['Program'] == prog]
+        print(f"  Total Respondents (K1+K2): {len(prog_df)}")
         
         # Calculate scores
-        k1_scores = calculate_pieces_scores(prog_k1)
-        k2_scores = calculate_pieces_scores(prog_k2)
+        scores = calculate_pieces_scores(prog_df)
+        program_results[prog] = scores
         
-        # Create comparison data
-        prog_comp = []
-        for cat in CATEGORIES.keys():
-            prog_comp.append({
-                'Category': cat,
-                'Kuesioner 1 Score': k1_scores[cat],
-                'Kuesioner 2 Score': k2_scores[cat],
-                'Difference': k2_scores[cat] - k1_scores[cat]
-            })
+        # Save individual program results
+        res_df = pd.DataFrame(list(scores.items()), columns=['Category', 'Score'])
+        res_df.to_csv(os.path.join(prog_path, f'pieces_results_{prog}.csv'), index=False)
         
-        prog_df = pd.DataFrame(prog_comp)
-        prog_df.to_csv(os.path.join(prog_path, f'pre_test_pieces_comparison_{prog}.csv'), index=False)
-        
-        # 1. Kuesioner 1 Chart
+        # Program Chart
         plt.figure(figsize=(10, 6))
-        sns.barplot(x='Category', y='Kuesioner 1 Score', data=prog_df, palette='viridis')
-        plt.ylim(0, 5)
-        plt.title(f'Pre-test Analysis: Kuesioner 1 Satisfaction ({prog})')
+        # Fix: Assign hue to avoid FutureWarning
+        ax = sns.barplot(x='Category', y='Score', hue='Category', data=res_df, palette='viridis', legend=False)
+        # Add labels on top of bars
+        for container in ax.containers:
+            # Fix: Type checking for BarContainer
+            if isinstance(container, BarContainer):
+                ax.bar_label(container, fmt='%.2f', padding=3)
+            
+        plt.ylim(0, 5.5)  # Slightly higher to accommodate labels
+        plt.title(f'Pre-test Analysis: Total Satisfaction ({prog})')
         plt.axhline(y=3.41, color='red', linestyle='--', label='Satisfied Threshold (3.41)')
         plt.legend()
         plt.tight_layout()
-        plt.savefig(os.path.join(prog_path, f'pre_test_kuesioner_1_{prog}.png'))
-        plt.close()
-
-        # 2. Kuesioner 2 Chart
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Category', y='Kuesioner 2 Score', data=prog_df, palette='magma')
-        plt.ylim(0, 5)
-        plt.title(f'Pre-test Analysis: Kuesioner 2 Satisfaction ({prog})')
-        plt.axhline(y=3.41, color='red', linestyle='--', label='Satisfied Threshold (3.41)')
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(prog_path, f'pre_test_kuesioner_2_{prog}.png'))
-        plt.close()
-
-        # 3. Comparison Chart (K1 vs K2)
-        prog_melted = prog_df.melt(id_vars='Category', value_vars=['Kuesioner 1 Score', 'Kuesioner 2 Score'], 
-                                   var_name='Kuesioner Type', value_name='Score')
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Category', y='Score', hue='Kuesioner Type', data=prog_melted, palette='muted')
-        plt.ylim(0, 5)
-        plt.title(f'Pre-test Analysis: Kuesioner 1 vs Kuesioner 2 ({prog})')
-        plt.axhline(y=3.41, color='gray', linestyle='--', alpha=0.5)
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(prog_path, f'pre_test_comparison_{prog}.png'))
+        plt.savefig(os.path.join(prog_path, f'pieces_total_{prog}.png'))
         plt.close()
         
         print(f"  Files saved in {prog_path}")
 
-    print("\nAll Pre-test separate reports have been generated successfully.")
+    # Final Comparison between D3 and D4
+    print("\nGenerating final comparison between D3 and D4...")
+    comparison_data = []
+    for cat in CATEGORIES.keys():
+        comparison_data.append({
+            'Category': cat,
+            'D3 Score': program_results['D3'][cat],
+            'D4 Score': program_results['D4'][cat],
+            'Difference': program_results['D4'][cat] - program_results['D3'][cat]
+        })
+    
+    comp_df = pd.DataFrame(comparison_data)
+    comp_df.to_csv(os.path.join('output', 'comparison_D3_vs_D4.csv'), index=False)
+    
+    # Comparison Chart
+    comp_melted = comp_df.melt(id_vars='Category', value_vars=['D3 Score', 'D4 Score'], 
+                               var_name='Program', value_name='Score')
+    plt.figure(figsize=(12, 7))
+    ax = sns.barplot(x='Category', y='Score', hue='Program', data=comp_melted, palette='Set2')
+    # Add labels on top of bars
+    for container in ax.containers:
+        # Fix: Type checking for BarContainer
+        if isinstance(container, BarContainer):
+            ax.bar_label(container, fmt='%.2f', padding=3)
+        
+    plt.ylim(0, 5.5)
+    plt.title('Pre-test Analysis Comparison: D3 vs D4 (K1+K2 Merged)')
+    plt.axhline(y=3.41, color='gray', linestyle='--', alpha=0.5)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join('output', 'comparison_D3_vs_D4.png'))
+    plt.close()
+    
+    print("Final comparison files saved in output/")
+    print("\nAll reports have been generated successfully.")
 
 if __name__ == "__main__":
     main()
