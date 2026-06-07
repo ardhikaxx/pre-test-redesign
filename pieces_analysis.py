@@ -100,13 +100,7 @@ def main():
         plt.figure(figsize=(10, 6))
         # Fix: Assign hue to avoid FutureWarning
         ax = sns.barplot(x='Category', y='Score', hue='Category', data=res_df, palette='viridis', legend=False)
-        # Add labels on top of bars
-        for container in ax.containers:
-            # Fix: Type checking for BarContainer
-            if isinstance(container, BarContainer):
-                ax.bar_label(container, fmt='%.2f', padding=3)
-            
-        plt.ylim(0, 5.5)  # Slightly higher to accommodate labels
+        plt.ylim(0, 5)
         plt.title(f'Pre-test Analysis: Total Satisfaction ({prog})')
         plt.axhline(y=3.41, color='red', linestyle='--', label='Satisfied Threshold (3.41)')
         plt.legend()
@@ -135,13 +129,7 @@ def main():
                                var_name='Program', value_name='Score')
     plt.figure(figsize=(12, 7))
     ax = sns.barplot(x='Category', y='Score', hue='Program', data=comp_melted, palette='Set2')
-    # Add labels on top of bars
-    for container in ax.containers:
-        # Fix: Type checking for BarContainer
-        if isinstance(container, BarContainer):
-            ax.bar_label(container, fmt='%.2f', padding=3)
-        
-    plt.ylim(0, 5.5)
+    plt.ylim(0, 5)
     plt.title('Pre-test Analysis Comparison: D3 vs D4 (K1+K2 Merged)')
     plt.axhline(y=3.41, color='gray', linestyle='--', alpha=0.5)
     plt.legend()
